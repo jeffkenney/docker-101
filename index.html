@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Docker for Non-Majors</title>
+    <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i|Roboto+Condensed:400,400i,700,700i|Roboto+Mono:400,400i,700,700i" rel="stylesheet">
+    <link href="css/main.css" rel="stylesheet">
+    <script src="js/remark.min.js"></script>
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle
+
+![docker](img/docker-horizontal.png)
+# for Non-Majors
+
+<small>Jeff Kenney</small>
+
+<small>05/11/2017</small>
+
+---
+
+class: center, middle
+
+# Containers
+
+---
+
+## What are Containers?
+
+.col-left-40[
+![containers](img/containers.png)
+]
+
+.col-right-60[
+- self-contained, isolated applications
+- each container gets its own:
+    - root filesystem and mounts
+        - `/var`, `/etc`, `/mnt`, ...
+    - process tree
+        - `pid 1`
+    - network stack
+        - full set of ports, IP addresses
+    - users
+        - `root`
+- provided by Linux kernel: **[namespaces](https://en.wikipedia.org/wiki/Linux_namespaces)**
+]
+
+---
+
+## What are Containers?
+
+.col-left-40[
+![containers](img/containers.png)
+]
+
+.col-right-60[
+- each container can have resource limits imposed on it
+- provided by Linux kernel: **[cgroups](https://en.wikipedia.org/wiki/Cgroups)**
+
+
+- processes in containers can run with fine-grained superuser privileges rather than having to run as root
+- provided by Linux kernel: **[capabilities](https://wiki.archlinux.org/index.php/Capabilities)**
+]
+
+---
+## What are Containers?
+
+.col-left-40[
+![containers](img/containers.png)
+]
+
+.col-right-60[
+**Typically, containers:**
+  - consist of application code + all binaries and libraries required to run an application
+  - run **one** process: the application
+  - do **not** run a full operating system
+    - while they can contain they same binaries as a full Linux distribution, there is no `init` system to handle process management and run background services
+]
+
+---
+
+## Why Containers?
+
+- no need to run multiple VMs with multiple OS installs just to run an app in production
+- all environments run the code in the same execution environment
+- continuous integration
+    - The tests can be run in the same execution environment that the code will run in
+- local development
+    - Can run containers with external app dependencies to reduce need of shared dev dependencies (databases)
+    - Can run multiple different versions of the same thing (e.g. different versions of Postgres for different apps)
+---
+
+class: center, middle
+
+# Docker
+
+---
+
+## What is Docker?
+
+.col-left-40[
+![docker](img/docker-vertical.png)]
+
+.col-right-60[
+**Docker**
+
+_noun_
+
+1. A platform for running containers
+1. The company of the same name
+]
+
+---
+
+## Installation
+
+- macOS
+    - https://download.docker.com/mac/stable/Docker.dmg
+- Windows
+    - https://download.docker.com/win/stable/InstallDocker.msi
+
+---
+
+## Components of Docker
+
+**Docker Engine**
+
+- The container runtime - allows running containers anywhere... with a Linux kernel
+- Virtual machines required to run containers on macOS or Windows (Docker does this automatically)
+
+**Images**
+
+- "An image is a lightweight, stand-alone, **executable package** that includes everything needed to run a piece of software, including the code, a runtime, libraries, environment variables, and config files."
+
+**Containers**
+
+- "A container is a **runtime instance** of an image – what the image becomes in memory when actually executed."
+
+---
+
+## Docker Lifecycle
+
+![lifecycle](img/lifecycle.png)
+
+---
+
+## Docker Images
+
+.col-left-40[
+![container layers](img/container-layers.jpg)
+]
+
+.col-right-60[
+- pre-built filesystem comprised of multiple layers
+- bottom layer is a base image
+    - usually based on an OS (Ubuntu, CentOS, etc.)
+    - sets up the root filesystem
+- other layers added during application installs, etc.
+- all layers are read-only
+    - containers get a new writable layer when running
+    - files copied to the writable layer when modified
+]
+
+---
+
+## Docker Images
+
+Image layers are shared across all containers on a system
+
+![sharing layers](img/sharing-layers.jpg)
+
+---
+
+## Docker Images
+
+**Creating Images**
+- built from a **Dockerfile** (covered in the next section)
+
+**Distribution**
+- versioned with **tags**
+- stored in and downloaded from **repositories** (like [Docker Hub](https://hub.docker.com/))
+
+**Commands**
+- `docker images` -- show all images on the system
+- `docker save` -- save an image to a `.tar` file (for copying between systems)
+- `docker load` -- load a `.tar` file containing an image into the Docker engine
+- `docker rmi` -- delete an image
+
+---
+
+## Dockerfile
+
+- A plaintext file containing instructions for building an image
+
+.col-left-50[
+```dockerfile
+FROM nginx:latest
+
+RUN apt-get update
+
+COPY ./index.html /usr/share/nginx/html/
+
+ENV DOCKER_IS_AWESOME=true
+
+EXPOSE 80
+
+# USER nginx
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+]
+
+.col-right-50[
+**FROM**: specify the base image to be used
+
+**RUN**: run a command during the build process
+
+**COPY**: copy a file from the host into the image
+
+**ENV**: set an environment variable
+
+**EXPOSE**: open a port when running the container
+
+**USER**: the user to run all further directives as (default root)
+
+**CMD**: the command to run when running the image as a container
+]
+
+---
+
+## Building An Image From A Dockerfile
+
+**Command:** `docker build <build context dir>`
+- builds an image from Dockerfile commands
+- builds a layer for each Dockerfile command, and encapsulates them into a final image
+    - image layers are cached, so if the Dockerfile command used to build that layer doesn't change, it doesn't have to rebuild that layer
+- executes within a **build context** directory
+    - Dockerfile `COPY` directives are relative to the build context
+    - the only files available for Docker to copy in are the files in the build context
+
+---
+
+class: center, middle
+
+# Demo: Images
+
+---
+
+## Docker Containers
+
+.col-left-50[
+![container layers](img/container-layers.jpg)
+]
+
+.col-right-50[
+- running instances of an image
+- run a single process as `pid 1`
+    - will stop when that process exits
+- use the read-only filesystem layers from the image and add a writable layer
+    - this layer persists when the container is stopped and restarted
+]
+
+---
+
+## Running Containers
+
+**Command:** `docker run [options] <image> [command]`
+- `-it` -- interactive with TTY
+- `-d` -- as a background process
+- `-p <host>:<container>` -- map a host port to a container port
+- `<image>` - an image ID or tag
+- `[command]` - an optional command to run (overrides the `CMD` Dockerfile directive)
+
+---
+
+## Docker Containers
+
+**Commands**
+- `docker stop` -- stop a running container
+- `docker start`-- start a stopped container
+    - don't need to respecify port mappings, etc.
+- `docker restart` -- restart a running container
+- `docker ps` -- list running containers (`-a` to also list stopped containers)
+- `docker attach` -- attach to the TTY of a running container (think `tmux`)
+    - `Ctrl + P + Q` to detach
+- `docker top` -- view the list of all processes running in a container
+- `docker exec` -- execute a new process in a running container
+- `docker rm` -- delete a container
+
+---
+
+class: center, middle
+
+## Demo: Containers
+
+---
+
+## Links
+
+- [Docker Docs](https://docs.docker.com/)
+    - [Docker Get Started](https://docs.docker.com/get-started/)
+    - [Dockerfile reference](https://docs.docker.com/engine/reference/builder/)
+    - [CLI Reference](https://docs.docker.com/engine/reference/commandline/cli/)
+    - [Samples / Tutorials](https://docs.docker.com/samples/)
+- [Awesome Docker](https://veggiemonk.github.io/awesome-docker/)
+    </textarea>
+    <script src="js/index.js"></script>
+  </body>
+</html>
